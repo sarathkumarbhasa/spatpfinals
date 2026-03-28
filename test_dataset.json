@@ -1,0 +1,57 @@
+[
+  {"sender_id":"acc_v1","receiver_id":"acc_v2","amount":2000,"timestamp":"2026-03-28T10:00:00Z"},
+  {"sender_id":"acc_v1","receiver_id":"acc_v3","amount":2200,"timestamp":"2026-03-28T10:01:00Z"},
+  {"sender_id":"acc_v1","receiver_id":"acc_v4","amount":2400,"timestamp":"2026-03-28T10:02:00Z"},
+
+  {"sender_id":"acc_v2","receiver_id":"acc_v5","amount":2600,"timestamp":"2026-03-28T10:03:00Z"},
+  {"sender_id":"acc_v2","receiver_id":"acc_v6","amount":2700,"timestamp":"2026-03-28T10:04:00Z"},
+
+  {"sender_id":"acc_zero","receiver_id":"acc_z1","amount":12000,"timestamp":"2026-03-28T11:00:00Z"},
+  {"sender_id":"acc_zero","receiver_id":"acc_z2","amount":13000,"timestamp":"2026-03-28T11:01:00Z"},
+  {"sender_id":"acc_zero","receiver_id":"acc_z3","amount":14000,"timestamp":"2026-03-28T11:02:00Z"},
+  {"sender_id":"acc_zero","receiver_id":"acc_z4","amount":15000,"timestamp":"2026-03-28T11:03:00Z"},
+  {"sender_id":"acc_zero","receiver_id":"acc_z5","amount":16000,"timestamp":"2026-03-28T11:04:00Z"},
+
+  {"sender_id":"acc_float","receiver_id":"acc_f1","amount":3000,"timestamp":"2026-03-28T12:00:00Z"},
+  {"sender_id":"acc_float","receiver_id":"acc_f2","amount":3100,"timestamp":"2026-03-28T12:01:00Z"},
+  {"sender_id":"acc_float","receiver_id":"acc_f3","amount":3200,"timestamp":"2026-03-28T12:02:00Z"},
+
+  {"sender_id":"acc_dorm1","receiver_id":"acc_dorm2","amount":20000,"timestamp":"2026-03-28T13:00:00Z"},
+  {"sender_id":"acc_dorm2","receiver_id":"acc_dorm3","amount":21000,"timestamp":"2025-12-29T00:01:00Z"},
+  {"sender_id":"acc_dorm3","receiver_id":"acc_dorm4","amount":22000,"timestamp":"2025-12-28T00:00:00Z"},
+
+  {"sender_id":"acc_ft1","receiver_id":"acc_ft2","amount":15000,"timestamp":"2026-03-28T14:00:00Z"},
+  {"sender_id":"acc_ft2","receiver_id":"acc_ft3","amount":16000,"timestamp":"2026-02-26T13:59:59Z"},
+
+  {"sender_id":"acc_m1","receiver_id":"acc_same","amount":5000,"timestamp":"2026-03-28T15:00:00Z"},
+  {"sender_id":"acc_m1","receiver_id":"acc_same","amount":6000,"timestamp":"2026-03-28T15:01:00Z"},
+  {"sender_id":"acc_m1","receiver_id":"acc_same","amount":7000,"timestamp":"2026-03-28T15:02:00Z"},
+
+  {"sender_id":"acc_m2","receiver_id":"acc_a","amount":8000,"timestamp":"2026-03-28T16:00:00Z"},
+  {"sender_id":"acc_m2","receiver_id":"acc_b","amount":9000,"timestamp":"2026-03-28T16:03:00Z"},
+  {"sender_id":"acc_m2","receiver_id":"acc_c","amount":10000,"timestamp":"2026-03-28T16:07:00Z"},
+
+  {"sender_id":"acc_m3","receiver_id":"acc_x","amount":11000,"timestamp":"2026-03-28T17:00:00Z"},
+  {"sender_id":"acc_m3","receiver_id":"acc_y","amount":12000,"timestamp":"2026-03-28T17:01:00Z"},
+  {"sender_id":"acc_m3","receiver_id":"acc_z","amount":13000,"timestamp":"2026-03-28T17:02:00Z"},
+
+  {"sender_id":"acc_chainA","receiver_id":"acc_chainB","amount":75000,"timestamp":"2026-03-28T18:00:00Z"},
+  {"sender_id":"acc_chainB","receiver_id":"acc_chainC","amount":76000,"timestamp":"2026-03-28T18:01:00Z"},
+  {"sender_id":"acc_chainC","receiver_id":"acc_chainD","amount":77000,"timestamp":"2026-03-28T18:02:00Z"},
+  {"sender_id":"acc_chainD","receiver_id":"acc_chainE","amount":78000,"timestamp":"2026-03-28T18:03:00Z"},
+
+  {"sender_id":"acc_dup","receiver_id":"acc_dup2","amount":5000,"timestamp":"2026-03-28T19:00:00Z"},
+  {"sender_id":"acc_dup","receiver_id":"acc_dup2","amount":5000,"timestamp":"2026-03-28T19:00:00Z"},
+  {"sender_id":"acc_dup","receiver_id":"acc_dup2","amount":5000,"timestamp":"2026-03-28T19:00:00Z"},
+
+  {"sender_id":"acc_tz","receiver_id":"acc_tz2","amount":20000,"timestamp":"2026-03-28T20:00:00+05:30"},
+  {"sender_id":"acc_tz","receiver_id":"acc_tz3","amount":21000,"timestamp":"2026-03-28T14:30:00Z"},
+
+  {"sender_id":"acc_overlap","receiver_id":"acc_o1","amount":60000,"timestamp":"2026-03-28T21:00:00Z"},
+  {"sender_id":"acc_overlap","receiver_id":"acc_o2","amount":61000,"timestamp":"2026-03-28T21:01:00Z"},
+  {"sender_id":"acc_overlap","receiver_id":"acc_o3","amount":62000,"timestamp":"2026-03-28T21:02:00Z"},
+
+  {"sender_id":"acc_noise1","receiver_id":"acc_noise2","amount":2000,"timestamp":"2026-03-28T22:00:00Z"},
+  {"sender_id":"acc_noise2","receiver_id":"acc_noise3","amount":3000,"timestamp":"2026-03-28T22:05:00Z"},
+  {"sender_id":"acc_noise3","receiver_id":"acc_noise4","amount":4000,"timestamp":"2026-03-28T22:10:00Z"}
+]
