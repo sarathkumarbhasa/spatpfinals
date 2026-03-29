@@ -7,27 +7,29 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
     G = nx.DiGraph()
     
     # Financial state tracking
-    balances = {} # {account_id: {"received": 0, "sent": 0}}
+    balances = {} # {account_id: {"received": 0, "sent": 0, "looted": 0}}
     
     # Time-aware edge tracking for rapid transfer detection
     tx_times = [] # List of (timestamp, sender, receiver, amount, type, id, risk)
     
-    # 1. Fetch all related transactions in the last year to build state
-    one_year_ago = datetime.now(timezone.utc) - timedelta(days=365)
-    
-    cursor = db.transactions.find({"timestamp": {"$gte": one_year_ago.replace(tzinfo=None)}}).sort("timestamp", 1)
-    all_txs = await cursor.to_list(length=5000)
+    # 1. Fetch all transactions to build state (No time filter for forensic completeness)
+    cursor = db.transactions.find({}).sort("timestamp", 1)
+    all_txs = await cursor.to_list(length=10000)
     
     for tx in all_txs:
         s, r = tx["sender_id"], tx["receiver_id"]
         amt = float(tx.get("amount", 0))
         ts = tx.get("timestamp")
+        is_fraud = tx.get("risk_score", 0) >= 0.7 or tx.get("status") == "HOLD"
         
         # Update balances
-        if s not in balances: balances[s] = {"received": 0, "sent": 0}
-        if r not in balances: balances[r] = {"received": 0, "sent": 0}
+        if s not in balances: balances[s] = {"received": 0, "sent": 0, "looted": 0}
+        if r not in balances: balances[r] = {"received": 0, "sent": 0, "looted": 0}
         balances[s]["sent"] += amt
         balances[r]["received"] += amt
+        
+        if is_fraud:
+            balances[s]["looted"] += amt
         
         tx_times.append({
             "ts": ts,
@@ -35,6 +37,7 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
             "r": r,
             "amt": amt,
             "id": str(tx["_id"]),
+            "withdrawal_type": tx.get("withdrawal_type", "UPI"),
             "risk": tx.get("risk_score", 0),
             "status": tx.get("status", "NORMAL"),
             "reasoning": tx.get("reasoning", ""),
@@ -44,12 +47,21 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
 
     # 2. Build graph and compute depth (BFS from root)
     for tx in tx_times:
-        G.add_edge(tx["s"], tx["r"], weight=tx["amt"], timestamp=tx["ts"], risk=tx["risk"], id=tx["id"], status=tx["status"], reasoning=tx["reasoning"], factors=tx["factors"], confidence=tx["confidence"])
+        G.add_edge(tx["s"], tx["r"], weight=tx["amt"], timestamp=tx["ts"], risk=tx["risk"], id=tx["id"], status=tx["status"], reasoning=tx["reasoning"], factors=tx["factors"], confidence=tx["confidence"], withdrawal_type=tx["withdrawal_type"])
 
     # BFS for depth
-    queue = [(root_account_id, 0)]
-    visited = {root_account_id}
-    depth_map = {root_account_id: 0}
+    # Find all victim accounts to use as roots if the specified root is a victim
+    victim_accounts = await db.accounts.find({"is_victim": True}).to_list(length=10)
+    victim_ids = [acc["account_id"] for acc in victim_accounts]
+    
+    roots = [root_account_id]
+    if root_account_id in victim_ids:
+        roots = victim_ids
+    
+    queue = [(rid, 0) for rid in roots if rid in G.nodes]
+    visited = set(rid for rid in roots if rid in G.nodes)
+    depth_map = {rid: 0 for rid in roots if rid in G.nodes}
+    
     while queue:
         curr, depth = queue.pop(0)
         depth_map[curr] = depth
@@ -63,10 +75,16 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
     nodes_data = []
     edges_data = []
     
+    # Calculate min/max looted for color coding
+    looted_amounts = [b["looted"] for b in balances.values() if b["looted"] > 0]
+    max_looted = max(looted_amounts) if looted_amounts else 0
+    min_looted = min(looted_amounts) if looted_amounts else 0
+
     for acc_id in visited:
-        bal = balances.get(acc_id, {"received": 0, "sent": 0})
+        bal = balances.get(acc_id, {"received": 0, "sent": 0, "looted": 0})
         sent = bal["sent"]
         received = bal["received"]
+        looted = bal["looted"]
         
         current_balance = received - sent
         recoverable = max(0, current_balance)
@@ -82,6 +100,18 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
         node_risk = max_risk
         node_reasoning = best_tx.get("reasoning", "")
         
+        # Color coding logic
+        node_color = "default"
+        if looted > 0:
+            if looted == max_looted:
+                node_color = "max_looted" # Dark Red
+            elif looted == min_looted:
+                node_color = "min_looted" # Green
+            else:
+                node_color = "looted" # Medium Red/Orange
+        elif received > 0 and looted == 0:
+             node_color = "safe" # Green
+
         if acc_profile:
             if acc_profile.get("status") == "FRAUD_CONFIRMED":
                 node_status = "FRAUD_CONFIRMED"
@@ -90,19 +120,10 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
             elif acc_profile.get("status") == "HOLD":
                 node_status = "HOLD"
 
-        # Intelligence Layer Status Logic
-        # MAPL (Pre-Fraud)
-        mapl_active = node_risk >= 0.7 or (acc_profile and acc_profile.get("risk_profile") == "high")
-        mapl_reason = node_reasoning if mapl_active else "Baseline behavioral profile normal."
-        mapl_action = "Velocity cap & enhanced monitoring applied." if mapl_active else "None."
-
-        # VACT (Fraud Moment)
-        vact_active = node_status in ["HOLD", "FRAUD_CONFIRMED"]
-        affected_nodes = list(nx.descendants(G, acc_id)) if vact_active else []
-        
-        # FFAP (Post-Fraud)
-        # Check if there are cross-bank indicators (e.g. large outgoing IMPS)
-        ffap_active = vact_active and any(t["amt"] > 20000 for t in node_txs if t["s"] == acc_id)
+        # Intelligence Layer Status Logic (Simplified per updated requirements)
+        # FFAP (Post-Fraud) - Layer 3
+        is_high_risk = node_status in ["HOLD", "FRAUD_CONFIRMED"]
+        ffap_active = is_high_risk and any(t["amt"] > 20000 for t in node_txs if t["s"] == acc_id)
         
         # System Trace Timeline
         timeline = []
@@ -114,7 +135,7 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
                 "detail": f"{'To' if action == 'Sent' else 'From'} {t['r'] if action == 'Sent' else t['s']}"
             })
         if node_status == "HOLD":
-            timeline.append({"time": datetime.now().strftime("%H:%M:%S"), "event": "Freeze applied", "detail": "VACT Layer triggered"})
+            timeline.append({"time": datetime.now().strftime("%H:%M:%S"), "event": "Freeze applied", "detail": "FFAP Layer tracking active"})
 
         nodes_data.append({
             "id": acc_id,
@@ -133,20 +154,11 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
                     "sent": sent,
                     "balance": current_balance,
                     "recoverable": recoverable,
-                    "lost": lost
+                    "lost": lost,
+                    "total_looted_amount": looted
                 },
+                "node_color_type": node_color,
                 "intelligence": {
-                    "mapl": {
-                        "status": "ACTIVE" if mapl_active else "INACTIVE",
-                        "reason": mapl_reason,
-                        "action": mapl_action
-                    },
-                    "vact": {
-                        "status": "ACTIVE" if vact_active else "INACTIVE",
-                        "source": "System/Victim" if node_status == "HOLD" else "None",
-                        "affected": len(affected_nodes),
-                        "targets": affected_nodes[:3] # Show first 3 targets
-                    },
                     "ffap": {
                         "status": "ACTIVE" if ffap_active else "INACTIVE",
                         "recoverable": recoverable,
@@ -176,7 +188,7 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
                 "data": {
                     "amount": tx["amt"],
                     "timestamp": tx["ts"].isoformat(),
-                    "type": "UPI" if tx["amt"] < 50000 else "IMPS",
+                    "type": tx["withdrawal_type"],
                     "time_delta": delta_seconds,
                     "is_rapid": is_rapid,
                     "risk_score": tx["risk"]

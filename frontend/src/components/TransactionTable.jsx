@@ -23,6 +23,8 @@ export default function TransactionTable({ transactions }) {
           <thead className="bg-gray-800 text-gray-400 sticky top-0 uppercase">
             <tr>
               <th className="px-4 py-3">Time</th>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Layer</th>
               <th className="px-4 py-3">Sender</th>
               <th className="px-4 py-3">Receiver</th>
               <th className="px-4 py-3 text-right">Amount</th>
@@ -34,7 +36,20 @@ export default function TransactionTable({ transactions }) {
           <tbody>
             {(transactions || []).map((tx, idx) => (
               <tr key={idx} className="border-b border-gray-800 hover:bg-gray-800/50">
-                <td className="px-4 py-3 whitespace-nowrap">{new Date(tx.timestamp).toLocaleTimeString()}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <div className="flex flex-col">
+                    <span className="text-gray-200">{new Date(tx.timestamp).toLocaleDateString()}</span>
+                    <span className="text-gray-500 text-[10px]">{new Date(tx.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="bg-gray-700 text-gray-200 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase">
+                    {tx.withdrawal_type || 'UPI'}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-gray-400 font-bold">L{tx.layer || 0}</span>
+                </td>
                 <td className="px-4 py-3 font-mono text-xs">{tx.sender_id}</td>
                 <td className="px-4 py-3 font-mono text-xs">{tx.receiver_id}</td>
                 <td className="px-4 py-3 text-right">₹{tx.amount?.toLocaleString()}</td>
@@ -55,10 +70,10 @@ export default function TransactionTable({ transactions }) {
                     {tx.status || 'COMPLETED'}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 whitespace-nowrap text-right text-xs font-medium">
                   <button 
                     onClick={() => navigate(`/graph?account_id=${tx.sender_id}`)}
-                    className="text-blue-400 hover:text-blue-300 underline"
+                    className="text-blue-500 hover:text-blue-400 font-bold uppercase tracking-widest text-[10px] bg-blue-500/10 px-3 py-1 rounded border border-blue-500/20 hover:bg-blue-500/20 transition-all tour-graph-button"
                   >
                     Graph
                   </button>

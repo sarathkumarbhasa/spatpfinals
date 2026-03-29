@@ -97,7 +97,7 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
     
     rule_multi_receiver = (distinct_receivers_in_5min >= 3)
     score_multi_receiver = 0.3 if rule_multi_receiver else 0.0
-
+    
     # Weight of each factor
     WEIGHTS = {
         "dormant": 0.25,

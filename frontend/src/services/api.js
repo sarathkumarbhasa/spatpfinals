@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
 });
 
 const safeReq = async (req) => {
@@ -10,9 +10,7 @@ const safeReq = async (req) => {
 };
 
 export const getTransactions = () => safeReq(api.get('/transactions/'));
-export const getAlerts = () => safeReq(api.get('/alerts/'));
 export const getGraph = (accountId) => safeReq(api.get(`/graph/?account_id=${accountId}`));
-export const simulateData = () => safeReq(api.post('/simulate/'));
-export const clearHolds = () => safeReq(api.post('/simulate/clear'));
+export const loadRealCase = () => safeReq(api.post('/transactions/load-real-case'));
 export const propagateHold = (accountId) => safeReq(api.post('/hold/propagate', { account_id: accountId }));
 export const confirmFraud = (accountId) => safeReq(api.post('/hold/confirm-fraud', { account_id: accountId }));

@@ -1,34 +1,35 @@
-import { simulateData } from '../services/api';
+import { useState } from 'react';
+import { loadRealCase } from '../services/api';
+import { useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 export default function ControlPanel({ onRefresh }) {
-  const handleSimulate = async () => {
-    await simulateData();
-    onRefresh();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  const handleLoadRealCase = async () => {
+    setLoading(true);
+    const res = await loadRealCase();
+    setLoading(false);
+    if (res?.success) {
+      onRefresh();
+      // Optional: don't navigate immediately to show dashboard data
+      // navigate('/graph?account_id=62350102489');
+    } else {
+        alert("Failed to load real case: " + (res?.message || "Unknown error"));
+    }
   };
 
   return (
-    <div className="bg-bgpanel p-4 rounded-xl mb-6 shadow-md">
-      <h2 className="text-xl font-bold mb-4 text-gray-200">Controls</h2>
-      <div className="flex gap-2 flex-wrap">
-        <button 
-          onClick={handleSimulate}
-          className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-semibold transition text-white"
-        >
-          Simulate
-        </button>
-        <button 
-          onClick={onRefresh}
-          className="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm font-semibold transition text-white"
-        >
-          Refresh
-        </button>
-        <button 
-          onClick={async () => { await clearHolds(); onRefresh(); }}
-          className="bg-red-600 hover:bg-red-500 px-4 py-2 rounded text-sm font-semibold transition text-white"
-        >
-          Clear DB
-        </button>
-      </div>
+    <div className="flex gap-3">
+      <button 
+        disabled={loading}
+        onClick={handleLoadRealCase}
+        className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 px-8 py-3 rounded-lg text-sm font-bold transition text-white shadow-lg uppercase tracking-widest border border-emerald-500/50 flex items-center gap-2 tour-load-button"
+      >
+        {loading && <Loader2 size={16} className="animate-spin" />}
+        {loading ? 'Processing train_final...' : 'Load Real Case (train_final)'}
+      </button>
     </div>
   );
 }

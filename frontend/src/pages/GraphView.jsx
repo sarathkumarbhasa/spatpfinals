@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import GraphVisualization from '../components/GraphVisualization';
 import BankSimulation from '../components/BankSimulation';
 import { getGraph, propagateHold, confirmFraud } from '../services/api';
-import { ArrowLeft, ShieldAlert, ShieldCheck, Activity, Database, Percent, Info, TrendingUp, TrendingDown, Wallet, AlertTriangle, Shield, Zap, Lock, History } from 'lucide-react';
+import { ArrowLeft, Activity, Wallet, AlertTriangle, Shield, Zap, History } from 'lucide-react';
 
 export default function GraphView() {
   const [searchParams] = useSearchParams();
@@ -21,6 +21,12 @@ export default function GraphView() {
       const res = await getGraph(accountId);
       if (res?.success) {
         setGraphData(res.data);
+        // If no data and we are using dummy, try to find a real victim
+        if (res.data.nodes.length === 0 && accountId === 'acc_dummy') {
+           const victims = ["62350102489", "50100250798812"];
+           navigate(`/graph?account_id=${victims[0]}`);
+           return;
+        }
         const updatedNode = res.data.nodes.find(n => n.id === (selectedNode?.id || accountId));
         if (updatedNode) setSelectedNode(updatedNode);
       }
@@ -103,112 +109,67 @@ export default function GraphView() {
                 <div className="flex gap-2 mt-2">
                   <span className="bg-gray-900 text-gray-400 text-[9px] px-2 py-0.5 rounded border border-gray-700 font-mono">DEPTH LVL: {selectedNode.data.depth}</span>
                   {selectedNode.data.is_new_account && <span className="bg-blue-900/40 text-blue-300 text-[9px] px-2 py-0.5 rounded border border-blue-700 font-bold">NEW ACCOUNT</span>}
-                  {selectedNode.data.is_unknown_account && <span className="bg-purple-900/40 text-purple-300 text-[9px] px-2 py-0.5 rounded border border-purple-700 font-bold">UNKNOWN</span>}
                 </div>
               </div>
 
-              {/* INTELLIGENCE LAYER STATUS */}
+              {/* INTELLIGENCE LAYER STATUS - ONLY FFAP */}
               <div className="space-y-3">
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-1 flex items-center gap-2">
-                    <Zap size={12} className="text-yellow-500" /> Intelligence Layer Status
+                    <Zap size={12} className="text-blue-500" /> Layer 3: FFAP Intelligence
                 </p>
-                <div className="space-y-2">
-                    {/* MAPL Layer */}
-                    <div className={`p-2 rounded border ${selectedNode.data.intelligence?.mapl?.status === 'ACTIVE' ? 'bg-yellow-900/20 border-yellow-700' : 'bg-gray-800/10 border-gray-800'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] font-bold text-yellow-500 uppercase">Layer 1: MAPL (Pre-Fraud)</span>
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${selectedNode.data.intelligence?.mapl?.status === 'ACTIVE' ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-gray-400'}`}>
-                                {selectedNode.data.intelligence?.mapl?.status}
-                            </span>
-                        </div>
-                        {selectedNode.data.intelligence?.mapl?.status === 'ACTIVE' && (
-                            <div className="text-[8px] space-y-1">
-                                <p className="text-gray-300"><span className="text-gray-500">TRIGGER:</span> {selectedNode.data.intelligence.mapl.reason}</p>
-                                <p className="text-gray-300"><span className="text-gray-500">ACTION:</span> {selectedNode.data.intelligence.mapl.action}</p>
-                            </div>
-                        )}
+                <div className={`p-3 rounded border ${selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' ? 'bg-blue-900/20 border-blue-700' : 'bg-gray-800/10 border-gray-800'}`}>
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] font-bold text-blue-500 uppercase">Post-Fraud Tracking</span>
+                        <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
+                            {selectedNode.data.intelligence?.ffap?.status}
+                        </span>
                     </div>
-
-                    {/* VACT Layer */}
-                    <div className={`p-2 rounded border ${selectedNode.data.intelligence?.vact?.status === 'ACTIVE' ? 'bg-red-900/20 border-red-700' : 'bg-gray-800/10 border-gray-800'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] font-bold text-red-500 uppercase">Layer 2: VACT (Fraud Moment)</span>
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${selectedNode.data.intelligence?.vact?.status === 'ACTIVE' ? 'bg-red-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                                {selectedNode.data.intelligence?.vact?.status}
-                            </span>
-                        </div>
-                        {selectedNode.data.intelligence?.vact?.status === 'ACTIVE' && (
-                            <div className="text-[8px] space-y-1">
-                                <p className="text-gray-300"><span className="text-gray-500">SOURCE:</span> {selectedNode.data.intelligence.vact.source}</p>
-                                <p className="text-gray-300"><span className="text-gray-500">AFFECTED:</span> {selectedNode.data.intelligence.vact.affected} Nodes</p>
-                                <p className="text-gray-300 truncate"><span className="text-gray-500">TARGETS:</span> {selectedNode.data.intelligence.vact.targets.join(', ')}</p>
+                    {selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' ? (
+                        <div className="text-[10px] space-y-2">
+                            <div className="flex justify-between text-gray-300">
+                                <span>RECOVERABLE: <span className="text-green-400 font-bold">₹{selectedNode.data.intelligence.ffap.recoverable.toLocaleString()}</span></span>
+                                <span>LOST: <span className="text-red-400 font-bold">₹{selectedNode.data.intelligence.ffap.lost.toLocaleString()}</span></span>
                             </div>
-                        )}
-                    </div>
-
-                    {/* FFAP Layer */}
-                    <div className={`p-2 rounded border ${selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' ? 'bg-blue-900/20 border-blue-700' : 'bg-gray-800/10 border-gray-800'}`}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[9px] font-bold text-blue-500 uppercase">Layer 3: FFAP (Post-Fraud)</span>
-                            <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-gray-400'}`}>
-                                {selectedNode.data.intelligence?.ffap?.status}
-                            </span>
-                        </div>
-                        {selectedNode.data.intelligence?.ffap?.status === 'ACTIVE' && (
-                            <div className="text-[8px] space-y-1">
-                                <div className="flex justify-between text-gray-300">
-                                    <span>RECOVERABLE: ₹{selectedNode.data.intelligence.ffap.recoverable.toLocaleString()}</span>
-                                    <span className="text-red-400">LOST: ₹{selectedNode.data.intelligence.ffap.lost.toLocaleString()}</span>
-                                </div>
-                                <p className="text-blue-400 font-bold">EXECUTION: PENDING CROSS-BANK FREEZE</p>
+                            <div className="bg-blue-900/30 p-2 rounded text-blue-400 font-bold text-center border border-blue-800/50">
+                                EXECUTION: PENDING CROSS-BANK FREEZE
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        <p className="text-[10px] text-gray-500 italic text-center">No post-fraud activity detected for this node.</p>
+                    )}
                 </div>
               </div>
 
               {/* Bank API Checking Simulation */}
               <BankSimulation ref={bankSimRef} selectedNode={selectedNode} />
 
-              {/* Financial State Tracking */}
+              {/* Transaction Details & Financials */}
               <div className="space-y-3">
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-1 flex items-center gap-2">
-                    <Wallet size={12} /> Financial State Tracking
+                    <Wallet size={12} /> Transaction Details
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-800/20 p-2 rounded">
-                        <div className="flex items-center gap-1 mb-1 text-green-400"><TrendingUp size={12}/> <span className="text-[9px] uppercase">Received</span></div>
-                        <p className="text-xs font-bold">₹{selectedNode.data.financials?.received?.toLocaleString()}</p>
+                    <div className="bg-gray-800/20 p-2 rounded col-span-2 border border-red-900/30">
+                        <div className="flex items-center gap-1 mb-1 text-red-500 font-bold uppercase"><Shield size={12}/> <span className="text-[9px]">Total Looted Amount</span></div>
+                        <p className="text-sm font-bold text-red-400">₹{selectedNode.data.financials?.total_looted_amount?.toLocaleString()}</p>
                     </div>
-                    <div className="bg-gray-800/20 p-2 rounded">
-                        <div className="flex items-center gap-1 mb-1 text-red-400"><TrendingDown size={12}/> <span className="text-[9px] uppercase">Sent</span></div>
-                        <p className="text-xs font-bold">₹{selectedNode.data.financials?.sent?.toLocaleString()}</p>
+                    <div className="bg-gray-800/20 p-2 rounded border border-gray-800">
+                        <span className="text-[9px] text-gray-500 uppercase block mb-1">Received</span>
+                        <p className="text-xs font-bold text-gray-300">₹{selectedNode.data.financials?.received?.toLocaleString()}</p>
                     </div>
-                    <div className="col-span-2 bg-blue-900/10 p-3 rounded border border-blue-900/30">
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="text-[10px] text-blue-300 uppercase font-bold">Recoverable Balance</span>
-                            <span className="text-[10px] text-blue-400 font-mono">₹{selectedNode.data.financials?.balance?.toLocaleString()}</span>
-                        </div>
-                        <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                                className="bg-blue-500 h-full transition-all duration-500" 
-                                style={{ width: `${(selectedNode.data.financials?.recoverable / (selectedNode.data.financials?.received || 1)) * 100}%` }}
-                            ></div>
-                        </div>
-                        <div className="flex justify-between mt-1 text-[8px] text-gray-500">
-                            <span>RECOVERABLE: ₹{selectedNode.data.financials?.recoverable?.toLocaleString()}</span>
-                            <span>LOST: ₹{selectedNode.data.financials?.lost?.toLocaleString()}</span>
-                        </div>
+                    <div className="bg-gray-800/20 p-2 rounded border border-gray-800">
+                        <span className="text-[9px] text-gray-500 uppercase block mb-1">Sent</span>
+                        <p className="text-xs font-bold text-gray-300">₹{selectedNode.data.financials?.sent?.toLocaleString()}</p>
                     </div>
                 </div>
               </div>
 
-              {/* System Trace Timeline */}
+              {/* System Trace Timeline - Simplified Transaction Details */}
               <div className="space-y-3">
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-1 flex items-center gap-2">
-                    <History size={12} /> System Trace Timeline
+                    <History size={12} /> System Trace
                 </p>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
                     {selectedNode.data.timeline?.map((item, i) => (
                         <div key={i} className="flex gap-3 relative pb-2 last:pb-0">
                             <div className="flex flex-col items-center">
@@ -225,7 +186,7 @@ export default function GraphView() {
                 </div>
               </div>
 
-              {/* Enforcement Preview & Actions */}
+              {/* Enforcement Actions */}
               <div className="pt-4 space-y-3">
                 {showPreview ? (
                     <div className="bg-orange-900/20 border border-orange-500/50 p-3 rounded-lg animate-in fade-in slide-in-from-bottom-2">
@@ -235,7 +196,7 @@ export default function GraphView() {
                         </div>
                         <p className="text-[11px] text-gray-300 mb-3">
                             Freezing this node will propagate downstream to <span className="text-white font-bold">{impact.count} accounts</span>.
-                            Estimated recoverable amount: <span className="text-green-400 font-bold">₹{impact.recoverable.toLocaleString()}</span>.
+                            Estimated recovery: <span className="text-green-400 font-bold">₹{impact.recoverable.toLocaleString()}</span>.
                         </p>
                         <div className="flex gap-2">
                             <button 
@@ -262,14 +223,14 @@ export default function GraphView() {
                 ) : (
                     <>
                         <button 
-                            disabled={loading}
+                            disabled={loading || selectedNode.data.status === 'HOLD'}
                             onClick={() => setShowPreview(true)}
                             className="w-full bg-orange-600 hover:bg-orange-500 disabled:bg-gray-700 py-2.5 rounded font-bold text-xs transition uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2"
                         >
-                            Propagate Hold Trace
+                            {selectedNode.data.status === 'HOLD' ? 'Hold Active' : 'Propagate Hold Trace'}
                         </button>
                         <button 
-                            disabled={loading}
+                            disabled={loading || selectedNode.data.status === 'FRAUD_CONFIRMED'}
                             onClick={async () => {
                                 setLoading(true);
                                 bankSimRef.current?.retry();
@@ -279,7 +240,7 @@ export default function GraphView() {
                             }}
                             className="w-full bg-red-700 hover:bg-red-600 disabled:bg-gray-700 py-2.5 rounded font-bold text-xs transition uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2"
                         >
-                            Confirm Fraud Detection
+                            {selectedNode.data.status === 'FRAUD_CONFIRMED' ? 'Fraud Confirmed' : 'Confirm Fraud Detection'}
                         </button>
                     </>
                 )}
