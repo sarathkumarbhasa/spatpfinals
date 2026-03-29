@@ -10,39 +10,46 @@ router = APIRouter()
 
 @router.post("/load-real-case", response_model=dict)
 async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
+    print(">>> Forensic Ingestion Started")
     try:
         import pandas as pd
         import asyncio
         # Robust CSV path finding
         possible_paths = [
             "train_final (1).csv",
+            "backend/train_final (1).csv",
             "../train_final (1).csv",
-            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "train_final (1).csv"),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "train_final (1).csv"),
             os.path.join(os.getcwd(), "train_final (1).csv"),
-            os.path.join(os.getcwd(), "..", "train_final (1).csv")
+            os.path.join(os.getcwd(), "backend", "train_final (1).csv")
         ]
         
         csv_path = None
         for p in possible_paths:
             if os.path.exists(p):
                 csv_path = p
+                print(f">>> Found CSV at: {p}")
                 break
         
         if not csv_path:
-            print("ERROR: CSV file 'train_final (1).csv' not found")
-            return {"success": False, "message": "CSV file 'train_final (1).csv' not found in any expected location.", "error": "File Not Found"}
+            print("ERROR: CSV file 'train_final (1).csv' not found in any expected location")
+            return {"success": False, "message": "Forensic CSV file not found on server disk.", "error": "FILE_NOT_FOUND"}
             
-        print(f"Loading real case from: {os.path.abspath(csv_path)}")
         try:
+            print(f">>> Reading CSV: {os.path.abspath(csv_path)}")
             df = pd.read_csv(csv_path)
+            print(f">>> CSV Read Success. Total rows: {len(df)}")
         except Exception as csv_err:
-            print(f"CSV Read Error: {csv_err}")
-            return {"success": False, "message": f"Failed to read CSV: {str(csv_err)}", "error": "CSV_READ_ERROR"}
+            print(f"!!! CSV Read Error: {csv_err}")
+            return {"success": False, "message": f"Server failed to read forensic data: {str(csv_err)}", "error": "CSV_READ_ERROR"}
 
         df = df.sort_values('Layer')
-        rows = df.head(100).to_dict('records')
+        # Limit to 50 rows for cloud stability (free tier memory limits)
+        rows = df.head(50).to_dict('records')
+        print(f">>> Processing top {len(rows)} records...")
 
         # Clear existing data
+        print(">>> Clearing stale database records...")
         await db.transactions.delete_many({})
         await db.accounts.delete_many({})
 
@@ -53,9 +60,10 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
         withdrawal_types = ["Cash Withdrawal", "ATM Withdrawal", "PhonePe", "Google Pay", "UPI", "NEFT", "RTGS", "IMPS", "Bank Transfer", "Others"]
 
         processed_count = 0
-        batch_size = 10
+        batch_size = 5
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
+            print(f">>> Processing batch {i//batch_size + 1}...")
             for idx_in_batch, row in enumerate(batch):
                 idx = i + idx_in_batch
                 try:
@@ -129,16 +137,18 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
                     )
                     processed_count += 1
                 except Exception as row_err:
-                    print(f"Error processing row {idx}: {row_err}")
+                    print(f"!!! Error processing row {idx}: {row_err}")
                     continue
-            # Yield to event loop to prevent blocking and potential timeouts
-            await asyncio.sleep(0.01)
+            # Yield to event loop
+            await asyncio.sleep(0.05)
 
-        return {"success": True, "message": f"Loaded {processed_count} real records from CSV", "error": None}
+        print(f">>> Success: Loaded {processed_count} records")
+        return {"success": True, "message": f"Successfully ingested {processed_count} forensic records.", "error": None}
     except Exception as e:
+        print(f"!!! CRITICAL ENDPOINT ERROR: {e}")
         import traceback
         traceback.print_exc()
-        return {"success": False, "message": str(e), "error": str(e)}
+        return {"success": False, "message": "A critical server error occurred during ingestion.", "error": str(e)}
 
 @router.post("/", response_model=dict)
 async def create_transaction(tx: TransactionCreate, db: AsyncIOMotorDatabase = Depends(get_db)):

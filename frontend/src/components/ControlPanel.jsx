@@ -13,10 +13,9 @@ export default function ControlPanel({ onRefresh }) {
     setLoading(false);
     if (res?.success) {
       onRefresh();
-      // Optional: don't navigate immediately to show dashboard data
-      // navigate('/graph?account_id=62350102489');
     } else {
-        alert("Failed to load real case: " + (res?.message || "Unknown error"));
+        const errorMsg = res?.message || res?.error || "Unknown forensic ingestion error";
+        alert("Failed to load real case: " + errorMsg);
     }
   };
 
