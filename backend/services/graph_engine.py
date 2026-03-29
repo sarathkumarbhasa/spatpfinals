@@ -54,6 +54,17 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
     victim_accounts = await db.accounts.find({"is_victim": True}).to_list(length=10)
     victim_ids = [acc["account_id"] for acc in victim_accounts]
     
+    # Calculate unique looted amount from victims only to avoid double counting
+    unique_looted = 0
+    victim_processed_txs = set()
+
+    for tx in tx_times:
+        if tx["s"] in victim_ids and tx["id"] not in victim_processed_txs:
+            # Check if this transaction is high risk or confirmed fraud
+            if tx["risk"] >= 0.7 or tx["status"] == "HOLD":
+                unique_looted += tx["amt"]
+                victim_processed_txs.add(tx["id"])
+
     roots = [root_account_id]
     if root_account_id in victim_ids:
         roots = victim_ids
@@ -197,5 +208,13 @@ async def build_account_graph(db: AsyncIOMotorDatabase, root_account_id: str) ->
 
     return {
         "nodes": nodes_data,
-        "edges": edges_data
+        "edges": edges_data,
+        "summary": {
+            "total_looted": unique_looted,
+            "total_recoverable": sum(max(0, balances[acc_id]["received"] - balances[acc_id]["sent"]) for acc_id in visited),
+            "high_risk_nodes": sum(1 for n in nodes_data if n["data"]["risk_score"] >= 0.7),
+            "rapid_transfers": sum(1 for e in edges_data if e["data"].get("is_rapid")),
+            "total_accounts": len(visited),
+            "total_transactions": len(edges_data)
+        }
     }

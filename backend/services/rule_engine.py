@@ -97,6 +97,40 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
     
     rule_multi_receiver = (distinct_receivers_in_5min >= 3)
     score_multi_receiver = 0.3 if rule_multi_receiver else 0.0
+
+    # 6. Rapid Outflow (Layering Detection)
+    # Check if sender received money recently (last 24h) and is now sending it out
+    twenty_four_hours_ago = timestamp - timedelta(hours=24)
+    recent_inbound = await db.transactions.find({
+        "receiver_id": sender_id,
+        "timestamp": {"$gte": twenty_four_hours_ago, "$lt": timestamp}
+    }).to_list(length=100)
+    
+    total_received_24h = sum(tx.get("amount", 0) for tx in recent_inbound)
+    rule_layering = (total_received_24h > 0 and amount >= (0.8 * total_received_24h))
+    score_layering = 0.5 if rule_layering else 0.0
+
+    # 7. Money Mule Profile (High churn, low balance)
+    # Check if sender's account has a lot of transactions but a very low balance relative to turnover
+    # For simplicity, we check the ratio of (received / sent) for the sender in the last 7 days
+    seven_days_ago = timestamp - timedelta(days=7)
+    past_sent = await db.transactions.find({
+        "sender_id": sender_id,
+        "timestamp": {"$gte": seven_days_ago, "$lt": timestamp}
+    }).to_list(length=500)
+    
+    past_received = await db.transactions.find({
+        "receiver_id": sender_id,
+        "timestamp": {"$gte": seven_days_ago, "$lt": timestamp}
+    }).to_list(length=500)
+    
+    total_sent_7d = sum(tx.get("amount", 0) for tx in past_sent) + amount
+    total_received_7d = sum(tx.get("amount", 0) for tx in past_received)
+    
+    # Mule indicator: High throughput but stays empty (received ~= sent)
+    # If they have received > 50k and sent > 90% of it, and balance is low
+    rule_mule = (total_received_7d > 50000 and total_sent_7d >= (0.9 * total_received_7d))
+    score_mule = 0.4 if rule_mule else 0.0
     
     # Weight of each factor
     WEIGHTS = {
@@ -104,14 +138,16 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
         "velocity": 0.30,
         "first_time_receiver": 0.35,
         "high_amount": 0.40,
-        "multi_receiver": 0.30
+        "multi_receiver": 0.30,
+        "layering": 0.50,
+        "mule": 0.40
     }
 
     # Confidence calculation based on data availability
     confidence_score = 1.0 if samples else 0.85
 
     # Tally Math determinism
-    risk_score = round(score_first_time + score_high_amount + score_velocity + score_dormant + score_multi_receiver, 2)
+    risk_score = round(score_first_time + score_high_amount + score_velocity + score_dormant + score_multi_receiver + score_layering + score_mule, 2)
 
     # Generate human-readable forensic reasoning with weights
     factors = []
@@ -120,6 +156,8 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
     if rule_velocity: factors.append({"factor": "Velocity spike", "weight": WEIGHTS["velocity"], "reason": f"Current window count {current_window_count} vs baseline {previous_window_average}"})
     if rule_dormant: factors.append({"factor": "Dormancy", "weight": WEIGHTS["dormant"], "reason": f"Reactivated after {int(days_since_last_activity)} days of inactivity"})
     if rule_multi_receiver: factors.append({"factor": "Multi-receiver", "weight": WEIGHTS["multi_receiver"], "reason": f"Burst of {distinct_receivers_in_5min} distinct recipients in 5m"})
+    if rule_layering: factors.append({"factor": "Layering Pattern", "weight": WEIGHTS["layering"], "reason": f"Rapid outflow detected: sending ₹{amount:,.0f} after receiving ₹{total_received_24h:,.0f} within 24h"})
+    if rule_mule: factors.append({"factor": "Money Mule Profile", "weight": WEIGHTS["mule"], "reason": f"High churn: Received ₹{total_received_7d:,.0f} and sent ₹{total_sent_7d:,.0f} in 7 days"})
     
     reasoning = " | ".join([f.get("reason") for f in factors]) if factors else "Standard transaction activity."
 
@@ -133,6 +171,9 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
             "incoming_last_30_days": incoming_last_30_days,
             "distinct_receivers_in_5min": distinct_receivers_in_5min,
             "transactions_last_5min": transactions_last_5min,
+            "total_received_24h": total_received_24h,
+            "total_received_7d": total_received_7d,
+            "total_sent_7d": total_sent_7d,
             "confidence_score": confidence_score
         },
         "factors": factors,
@@ -141,14 +182,18 @@ async def evaluate_transaction(db: AsyncIOMotorDatabase, sender_id: str, receive
             "velocity": rule_velocity,
             "first_time_receiver": rule_first_time,
             "high_amount": rule_high_amount,
-            "multi_receiver": rule_multi_receiver
+            "multi_receiver": rule_multi_receiver,
+            "layering": rule_layering,
+            "mule": rule_mule
         },
         "score_breakdown": {
             "dormant": score_dormant,
             "velocity": score_velocity,
             "first_time_receiver": score_first_time,
             "high_amount": score_high_amount,
-            "multi_receiver": score_multi_receiver
+            "multi_receiver": score_multi_receiver,
+            "layering": score_layering,
+            "mule": score_mule
         },
         "final_score": risk_score
     }

@@ -1,7 +1,44 @@
 import { useNavigate } from 'react-router-dom';
+import { FileText, ShieldAlert, Clock } from 'lucide-react';
 
 export default function TransactionTable({ transactions }) {
   const navigate = useNavigate();
+
+  const getRecoveryStatus = (timestamp) => {
+    const txDate = new Date(timestamp);
+    // Since the data is from 2020, we'll simulate "now" as 2 hours after the latest tx
+    const hoursElapsed = Math.floor((Date.now() - txDate.getTime()) / (1000 * 60 * 60));
+    
+    // For presentation purposes, let's use a mock relative hour if it's too old
+    const mockHours = (txDate.getHours() % 12) + 1; 
+    
+    if (mockHours <= 2) return { label: 'GOLDEN HOUR', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' };
+    if (mockHours <= 6) return { label: 'HIGH RECOVERY', color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20' };
+    return { label: 'STALE', color: 'text-red-400 bg-red-400/10 border-red-400/20' };
+  };
+
+  const handleDraftNotice = (tx) => {
+    const template = `
+LEGAL NOTICE UNDER SECTION 91 CrPC
+To: The Branch Manager, ${tx.receiver_id.startsWith('ACC_L') ? 'Partner Bank' : 'Nodal Bank'}
+Subject: Urgent Freeze Request for Fraudulent Transaction ID: ${tx._id || 'TXN_'+Math.random().toString(36).substr(2, 9)}
+
+This is to inform you that a fraudulent transaction of ₹${tx.amount} has been traced from victim account ${tx.sender_id} to account ${tx.receiver_id} in your branch.
+
+You are hereby directed to:
+1. Immediately FREEZE the said account.
+2. Provide KYC and transaction history for the last 30 days.
+3. Revert the funds if still available.
+
+Issued by: Cyber Crime Unit, Anantapur Police.
+    `;
+    const blob = new Blob([template], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Legal_Notice_${tx.receiver_id}.txt`;
+    link.click();
+  };
 
   const getRiskLabel = (score) => {
     if (score >= 0.7) return 'High';
@@ -28,6 +65,8 @@ export default function TransactionTable({ transactions }) {
               <th className="px-4 py-3">Sender</th>
               <th className="px-4 py-3">Receiver</th>
               <th className="px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3 text-left">Risk Pattern</th>
+              <th className="px-4 py-3 text-left">Recovery Window</th>
               <th className="px-4 py-3 text-center">Score</th>
               <th className="px-4 py-3 text-center">Status</th>
               <th className="px-4 py-3">Action</th>
@@ -53,6 +92,22 @@ export default function TransactionTable({ transactions }) {
                 <td className="px-4 py-3 font-mono text-xs">{tx.sender_id}</td>
                 <td className="px-4 py-3 font-mono text-xs">{tx.receiver_id}</td>
                 <td className="px-4 py-3 text-right">₹{tx.amount?.toLocaleString()}</td>
+                <td className="px-4 py-3 text-left">
+                  {tx.risk_flags && tx.risk_flags.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {tx.risk_flags.map((flag, i) => (
+                        <span key={i} className="text-[9px] bg-red-900/30 text-red-400 border border-red-800/50 px-1 rounded uppercase font-bold">
+                          {flag.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-gray-600 text-[10px] italic">Clear</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-left">
+                  <span className="text-gray-300">{tx.recovery_window || '24h'}</span>
+                </td>
                 <td className="px-4 py-3 text-center">
                   <div className="flex flex-col items-center">
                     <span className="text-[10px] font-bold text-gray-400 mb-1">{tx.risk_score}</span>

@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import GraphVisualization from '../components/GraphVisualization';
 import BankSimulation from '../components/BankSimulation';
 import { getGraph, propagateHold, confirmFraud } from '../services/api';
-import { ArrowLeft, Activity, Wallet, AlertTriangle, Shield, Zap, History } from 'lucide-react';
+import { ArrowLeft, Activity, Wallet, AlertTriangle, Shield, Zap, History, BarChart3, TrendingUp, Users, RefreshCw } from 'lucide-react';
 
 export default function GraphView() {
   const [searchParams] = useSearchParams();
@@ -18,6 +18,7 @@ export default function GraphView() {
 
   const refreshGraph = async () => {
     if (accountId) {
+      setLoading(true);
       const res = await getGraph(accountId);
       if (res?.success) {
         setGraphData(res.data);
@@ -25,11 +26,13 @@ export default function GraphView() {
         if (res.data.nodes.length === 0 && accountId === 'acc_dummy') {
            const victims = ["62350102489", "50100250798812"];
            navigate(`/graph?account_id=${victims[0]}`);
+           setLoading(false);
            return;
         }
         const updatedNode = res.data.nodes.find(n => n.id === (selectedNode?.id || accountId));
         if (updatedNode) setSelectedNode(updatedNode);
       }
+      setLoading(false);
     }
   };
 
@@ -96,6 +99,47 @@ export default function GraphView() {
         
         {/* Investigation Sidebar */}
         <div className="w-96 bg-bgpanel border-l border-gray-800 p-6 flex flex-col overflow-auto z-10 shadow-[-4px_0_15px_rgba(0,0,0,0.5)]">
+          {/* Network Summary Dashboard */}
+          {graphData?.summary && (
+            <div className="mb-8 space-y-4">
+              <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2 border-b border-gray-800 pb-2">
+                <BarChart3 size={16} className="text-blue-500" /> Network Overview
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-900/10 border border-blue-900/30 p-3 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Total Looted</p>
+                  <p className="text-lg font-bold text-red-400">₹{(graphData.summary.total_looted / 100000).toFixed(1)}L</p>
+                </div>
+                <div className="bg-green-900/10 border border-green-900/30 p-3 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Recoverable</p>
+                  <p className="text-lg font-bold text-green-400">₹{(graphData.summary.total_recoverable / 100000).toFixed(1)}L</p>
+                </div>
+                <div className="bg-gray-800/30 border border-gray-800 p-3 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Mule Accounts</p>
+                  <div className="flex items-end gap-1">
+                    <p className="text-lg font-bold text-white">{graphData.summary.high_risk_nodes}</p>
+                    <Users size={12} className="text-gray-500 mb-1" />
+                  </div>
+                </div>
+                <div className="bg-gray-800/30 border border-gray-800 p-3 rounded-lg">
+                  <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Rapid Relay</p>
+                  <div className="flex items-end gap-1">
+                    <p className="text-lg font-bold text-white">{graphData.summary.rapid_transfers}</p>
+                    <TrendingUp size={12} className="text-blue-500 mb-1" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center bg-gray-900/50 p-2 rounded border border-gray-800">
+                <span className="text-[10px] text-gray-500 uppercase">Analysis Confidence</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className={`w-2 h-1 rounded-full ${i <= 4 ? 'bg-blue-500' : 'bg-gray-700'}`}></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <h2 className="text-lg font-bold mb-4 border-b border-gray-700 pb-2 flex items-center gap-2">
             <Activity size={18} className="text-blue-400" /> Forensic Insight
           </h2>
@@ -139,6 +183,26 @@ export default function GraphView() {
                     )}
                 </div>
               </div>
+
+              {/* Risk Factors Section */}
+              {selectedNode.data.factors && selectedNode.data.factors.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest border-b border-gray-800 pb-1 flex items-center gap-2">
+                      <AlertTriangle size={12} className="text-orange-500" /> Risk Evidence
+                  </p>
+                  <div className="space-y-2">
+                    {selectedNode.data.factors.map((f, i) => (
+                      <div key={i} className="bg-orange-900/10 border border-orange-900/20 p-2 rounded">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="text-[10px] font-bold text-orange-400 uppercase">{f.factor}</span>
+                          <span className="text-[9px] text-gray-500">WT: {f.weight}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 leading-tight">{f.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Bank API Checking Simulation */}
               <BankSimulation ref={bankSimRef} selectedNode={selectedNode} />

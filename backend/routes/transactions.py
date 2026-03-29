@@ -61,9 +61,16 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
 
         processed_count = 0
         batch_size = 5
+        # Pre-cache existing accounts to avoid redundant lookups
+        existing_accounts = await db.accounts.find().to_list(length=1000)
+        account_map = {acc["account_id"]: acc for acc in existing_accounts}
+
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i + batch_size]
-            print(f">>> Processing batch {i//batch_size + 1}...")
+            print(f">>> Processing batch {i//batch_size + 1}/{len(rows)//batch_size + 1}...")
+            
+            # Use gather to parallelize within the batch if possible, or just be careful
+            # For now, let's keep it sequential but faster
             for idx_in_batch, row in enumerate(batch):
                 idx = i + idx_in_batch
                 try:
@@ -78,13 +85,17 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
                     
                     receiver_id = f"ACC_L{layer}_{idx % 5}"
                     
-                    w_type = withdrawal_types[idx % len(withdrawal_types)]
+                    # Map withdrawal type from primary amount for realism
+                    w_type = "UPI"
                     if amount > 100000: w_type = "RTGS"
                     elif amount > 50000: w_type = "NEFT"
-                    elif amount < 5000: w_type = "UPI"
+                    elif amount > 20000: w_type = "IMPS"
+                    elif amount < 5000: w_type = "PhonePe"
                     
                     ts = base_date + timedelta(days=int(row['Txn_Day']), hours=int(row['Txn_Hour']), minutes=idx % 60)
 
+                    # Optimize: For ingestion, maybe skip the full evaluation if it's too slow
+                    # or at least make it faster.
                     evaluation = await evaluate_transaction(
                         db=db,
                         sender_id=sender_id,
@@ -107,17 +118,20 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
                         "risk_score": final_risk,
                         "risk_flags": evaluation.get("risk_flags", []),
                         "is_high_risk": final_risk >= 0.7,
+                        "is_confirmed_fraud": bool(is_fraud),
                         "reasoning": reasoning,
                         "confidence_score": 1.0 if is_fraud else 0.8,
                         "factors": evaluation.get("factors", []),
                         "status": "HOLD" if (final_risk >= 0.7 or is_fraud) else "completed",
-                        "layer": layer
+                        "layer": layer,
+                        "persona": "Victim Source" if layer == 1 else "Mule/Layering"
                     }
                     
                     await db.transactions.insert_one(doc)
                     
-                    looted_inc = amount if is_fraud else 0.0
+                    looted_inc = amount if (is_fraud and layer == 1) else 0.0
                     
+                    # Optimized updates
                     await db.accounts.update_one(
                         {"account_id": sender_id},
                         {
@@ -139,8 +153,8 @@ async def load_real_case_endpoint(db: AsyncIOMotorDatabase = Depends(get_db)):
                 except Exception as row_err:
                     print(f"!!! Error processing row {idx}: {row_err}")
                     continue
-            # Yield to event loop
-            await asyncio.sleep(0.05)
+            # Yield to event loop to keep the server responsive
+            await asyncio.sleep(0.01)
 
         print(f">>> Success: Loaded {processed_count} records")
         return {"success": True, "message": f"Successfully ingested {processed_count} forensic records.", "error": None}
@@ -205,10 +219,34 @@ async def create_transaction(tx: TransactionCreate, db: AsyncIOMotorDatabase = D
 async def list_transactions(limit: int = 50, skip: int = 0, db: AsyncIOMotorDatabase = Depends(get_db)):
     try:
         txs = await db.transactions.find().sort("timestamp", -1).skip(skip).limit(limit).to_list(length=limit)
+        
+        # Calculate dashboard summary
+        total_txs = await db.transactions.count_documents({})
+        high_risk_count = await db.transactions.count_documents({"risk_score": {"$gte": 0.7}})
+        
+        # Avoid double counting: Only count transactions from Layer 1 (Victims) as total looted
+        total_looted = await db.transactions.aggregate([
+            {"$match": {"layer": 1, "is_confirmed_fraud": True}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}}
+        ]).to_list(length=1)
+        
+        looted_sum = total_looted[0]["total"] if total_looted else 0.0
+
         for tx in txs:
             tx["id"] = str(tx["_id"])
             tx.pop("_id", None)
             
-        return {"success": True, "data": {"transactions": txs}, "error": None}
+        return {
+            "success": True, 
+            "data": {
+                "transactions": txs,
+                "summary": {
+                    "total_count": total_txs,
+                    "high_risk_count": high_risk_count,
+                    "total_looted": looted_sum
+                }
+            }, 
+            "error": None
+        }
     except Exception as e:
         return {"success": False, "data": {}, "error": str(e)}
