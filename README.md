@@ -6,23 +6,18 @@
 
 ## 🚀 Key Features
 
-### 1. **Cinematic Intelligence Entry**
-- **Animated Splash Screen**: A professional, authoritative entrance sequence featuring the Anantapur Police insignia and a 7-second high-fidelity animation.
-- **Montserrat & Inter Typography**: Optimized for readability and an "Intelligence Unit" aesthetic.
+### 1. **Live Forensic Dashboard**
+- **Real-Time Tabbed Interface**: Toggle seamlessly between a dynamic network graph visualization and a granular, row-by-row transaction table.
+- **MongoDB Data Integration**: Ingest live and mock case data directly from a robust database cluster.
+- **Deterministic Risk Scoring**: A backend rules engine that mathematically scores transactions for velocity spikes, dormancy, and first-time receiver anomalies.
 
-### 2. **Live Forensic Dashboard**
-- **Real-Time Monitoring**: Tracks all transaction flows through the forensic engine.
-- **Demat Case Ingestion**: One-click ingestion of the `train_final (1).csv` dataset, reconstructing complex fraud trees automatically.
-- **Automated Risk Scoring**: Every transaction is evaluated for "Deep Chain" patterns and "Night-time" anomalies.
+### 2. **Investigation Graph Network**
+- **Isolated Subgraph Rendering**: Target specific transactions and instantly isolate their direct network trees for focused investigation.
+- **Deterministic Tree Mapping**: Visualize the complex flow of funds from victims (Layer 1) to endpoint mules (Layer 7).
 
-### 3. **Investigation Graph Network**
-- **Deterministic Tree Mapping**: Visualizes the flow of funds from victims (Layer 1) to endpoint mules (Layer 7).
-- **Node Intelligence**: Color-coded nodes highlighting high looted amounts and confirmed fraud status.
-- **Interactive Forensics**: Click any node to view bank-level communication logs and recovery timelines.
-
-### 4. **Enforcement & Recovery**
-- **Hold Trace Propagation**: Freeze an entire branch of the network instantly.
-- **Bank API Simulation**: Live simulation of freeze requests sent to major banks (SBI, IOB, KVB).
+### 3. **Enforcement & Legal Action**
+- **Legal Notice Generation (Section 91 CrPC)**: Instantly generate and download official legal notices (PDFs) for bank freeze requests directly from the forensic view.
+- **Hold Trace Propagation**: Propagate transaction freezes down an entire branch of the network with one click.
 - **Recoverable Amount Tracking**: Real-time calculation of potential fund recovery versus lost assets.
 
 ---
