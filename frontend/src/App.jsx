@@ -3,24 +3,15 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import GraphView from './pages/GraphView';
 import GuidedTour from './components/GuidedTour';
-import SplashScreen from './components/SplashScreen';
 import { Activity, Share2, HelpCircle } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
 
 function App() {
   const [runTour, setRunTour] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
 
   return (
     <BrowserRouter>
-      <AnimatePresence>
-        {showSplash && (
-          <SplashScreen onFinish={() => setShowSplash(false)} />
-        )}
-      </AnimatePresence>
-
       <GuidedTour run={runTour} setRun={setRunTour} />
-      <div className={`flex h-screen bg-bgdark text-gray-100 overflow-hidden font-sans transition-opacity duration-1000 ${showSplash ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`flex h-screen bg-bgdark text-gray-100 overflow-hidden font-sans transition-opacity duration-1000 opacity-100`}>
         {/* Modern Glassy Sidebar */}
         <aside className="w-64 border-r border-gray-800 bg-bgpanel/50 backdrop-blur-md flex flex-col z-20 shadow-2xl">
           <div className="p-6 border-b border-gray-800 flex items-center gap-3">
