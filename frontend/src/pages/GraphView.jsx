@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import GraphVisualization from '../components/GraphVisualization';
 import BankSimulation from '../components/BankSimulation';
 import { getGraph, propagateHold, confirmFraud } from '../services/api';
-import { ArrowLeft, Activity, Wallet, AlertTriangle, Shield, Zap, History, BarChart3, TrendingUp, Users, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Activity, Wallet, AlertTriangle, Shield, Zap, History, BarChart3, TrendingUp, Users, RefreshCw, FileText } from 'lucide-react';
 
 export default function GraphView() {
   const [searchParams] = useSearchParams();
@@ -76,6 +76,55 @@ export default function GraphView() {
   };
 
   const impact = selectedNode ? getAffectedNodes(selectedNode.id) : { count: 0, recoverable: 0 };
+
+  const handleGenerateNotice = () => {
+      if (!selectedNode) return;
+      
+      const node = selectedNode;
+      const accountId = node.id;
+      const totalLooted = node.data?.financials?.total_looted_amount || 0;
+      const riskScore = node.data?.risk_score || 0;
+      
+      const noticeContent = `NOTICE UNDER SECTION 91 OF CODE OF CRIMINAL PROCEDURE, 1973
+
+To,
+The Nodal Officer / Manager
+[Bank Name / Branch]
+
+Subject: Request for freezing of Account Number ${accountId} and providing KYC details regarding Cyber Fraud investigation.
+
+Sir/Madam,
+
+During the course of investigation into a reported cybercrime of financial fraud, it has been found that the suspected fraudulent funds have been routed to the following account maintained with your bank.
+
+Details of Subject Account:
+- Account Number: ${accountId}
+- Suspected Looted Amount Handled: INR ${totalLooted.toLocaleString()}
+- System Risk Score: ${riskScore}
+
+Our forensic platform "FraudShield" has tracked a direct illicit financial flow to this account. You are hereby requested under Section 91 of the Cr.P.C to immediately:
+1. Put a DEBIT FREEZE on the aforementioned account to prevent further unauthorized transfer of funds.
+2. Provide the complete KYC details, Account Statement from account opening date till today, IP logs, and device ID used for accessing this account.
+
+This is a time-sensitive request to recover stolen funds. Please acknowledge compliance immediately.
+
+Regards,
+Cyber Crime Investigation Unit
+Anantapur Police
+Date: ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+System Ref: FRAUDSHIELD-${accountId}-${Date.now()}
+`;
+
+      const blob = new Blob([noticeContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Section_91_Notice_${accountId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="h-screen w-full flex flex-col bg-bgmain">
@@ -305,6 +354,12 @@ export default function GraphView() {
                             className="w-full bg-red-700 hover:bg-red-600 disabled:bg-gray-700 py-2.5 rounded font-bold text-xs transition uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2"
                         >
                             {selectedNode.data.status === 'FRAUD_CONFIRMED' ? 'Fraud Confirmed' : 'Confirm Fraud Detection'}
+                        </button>
+                        <button 
+                            onClick={handleGenerateNotice}
+                            className="w-full bg-blue-700 hover:bg-blue-600 py-2.5 rounded font-bold text-xs transition uppercase tracking-wider text-white shadow-lg flex items-center justify-center gap-2 mt-2"
+                        >
+                            <FileText size={16} /> Generate Legal Notice (Sec 91)
                         </button>
                     </>
                 )}
